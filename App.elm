@@ -19,14 +19,9 @@ type alias Model = {
     }
 
 
-type alias Drag =
-    {
-      dragged : Dragged,
-      current : Position
-    }
+type alias Drag = { dragged : Dragged, current : Position }
 
 type Dragged = DragTopEndpoint1
-
 
 init : ( Model, Cmd Msg )
 init =
@@ -34,15 +29,15 @@ init =
 
 
 -- VIEW
-dragButton : Dragged -> Position -> Html.Html Msg
-dragButton dragged pos =
+dragButton : Position -> Html.Html Msg
+dragButton pos =
     let w = 30
     in
     rect [ x (Basics.toString (pos.x - w // 2)),
            y (Basics.toString (pos.y - w // 2)),
            width (Basics.toString w),
            height (Basics.toString w),
-           onMouseDown dragged]
+           onMouseDown DragTopEndpoint1 ]
          []
 
 onMouseDown : Dragged -> Attribute Msg
@@ -59,7 +54,7 @@ waves ({topEndpoint1Pos} as model) =
         svg
           [ width "500", height "500", viewBox "0 0 500 500" ]
           [ Svg.path [ d pathSpec, stroke "black", fill "none", strokeWidth "2" ] [],
-            dragButton DragTopEndpoint1 (model.topEndpoint1Pos) ]
+            dragButton model.topEndpoint1Pos ]
 
 
 view : Model -> Html Msg
@@ -69,8 +64,8 @@ view model = waves model
 -- UPDATE
 type Msg
     = DragStart Dragged Position
-    | DragAt Dragged Position
-    | DragEnd Dragged Position
+    | DragAt Position
+    | DragEnd Position
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -78,32 +73,30 @@ update msg model =
   ( updateHelp msg model, Cmd.none )
 
 
+setPosition : Dragged -> Position -> Model -> Model
+setPosition dragged =
+    case dragged of
+        DragTopEndpoint1 -> (\pos model -> { model | topEndpoint1Pos = pos })
+
+setDrag : Maybe Drag -> Model -> Model
+setDrag maybeDrag model = { model | drag = maybeDrag }
+
+
 updateHelp : Msg -> Model -> Model
-updateHelp msg ({topEndpoint1Pos, drag} as model) =
-  case msg of
-    DragStart dragged pos ->
-        Model (getPosition model) (Just (Drag dragged pos))
+updateHelp msg model =
+    case msg of
+        DragStart dragged pos ->
+            model |> setDrag (Just (Drag dragged pos))
+                  |> setPosition dragged pos
 
-    DragAt dragged pos ->
-        case drag of
-            Nothing -> model
-            Just drag2 -> Model (getPosition model) (Just (Drag dragged pos))
-
-        -- {model | drag = Maybe.map (\{start} -> Drag dragged start pos) drag}
-    DragEnd dragged _ ->
-      Model (getPosition model) Nothing
-
-
-getPosition : Model -> Position
-getPosition {topEndpoint1Pos, drag} =
-  case drag of
-    Nothing -> topEndpoint1Pos
-
-    Just {current} -> current
-      -- Position
-      --   (topEndpoint1Pos.x + current.x - start.x)
-      --   (topEndpoint1Pos.y + current.y - start.y)
-
+        DragAt pos ->
+            let {drag} = model in
+            case drag of
+                Nothing -> model
+                Just drag_ -> model |> setDrag (Just (Drag drag_.dragged pos))
+                                    |> setPosition drag_.dragged pos
+        DragEnd _ ->
+            model |> setDrag Nothing
 
 
 -- SUBSCRIPTIONS
@@ -114,7 +107,7 @@ subscriptions model =
       Sub.none
 
     Just _ ->
-      Sub.batch [ Mouse.moves (DragAt DragTopEndpoint1), Mouse.ups (DragEnd DragTopEndpoint1) ]
+      Sub.batch [ Mouse.moves DragAt, Mouse.ups DragEnd ]
 
 
 -- MAIN
