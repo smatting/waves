@@ -1,7 +1,7 @@
 module App exposing (..)
 
 import Html exposing (Html, button, div, text, program)
-import Html.Events exposing (onClick, on)
+import Html.Events exposing (onClick, on, onWithOptions)
 import Json.Decode as Decode
 import Mouse exposing (Position)
 
@@ -22,7 +22,6 @@ type alias Model = {
 type alias Drag =
     {
       dragged : Dragged,
-      start : Position,
       current : Position
     }
 
@@ -31,28 +30,31 @@ type Dragged = DragTopEndpoint1
 
 init : ( Model, Cmd Msg )
 init =
-    ( Model (Position 259 261) Nothing, Cmd.none )
+    ( Model (Position 306 84) Nothing, Cmd.none )
 
 
 -- VIEW
 dragButton : Dragged -> Position -> Html.Html Msg
 dragButton dragged pos =
-    rect [ x (Basics.toString pos.x),
-           y (Basics.toString pos.y),
-           width "30",
-           height "30",
+    let w = 30
+    in
+    rect [ x (Basics.toString (pos.x - w // 2)),
+           y (Basics.toString (pos.y - w // 2)),
+           width (Basics.toString w),
+           height (Basics.toString w),
            onMouseDown dragged]
          []
 
 onMouseDown : Dragged -> Attribute Msg
 onMouseDown dragged =
-  on "mousedown" (Decode.map (DragStart dragged) Mouse.position)
+    let options = { stopPropagation = True , preventDefault = True }
+    in onWithOptions "mousedown" options (Decode.map (DragStart dragged) Mouse.position)
 
 waves : Model -> Html.Html Msg
-waves model =
+waves ({topEndpoint1Pos} as model) =
     let
         pathSpec = LL.toString [ { moveto =  MoveTo Absolute (49, 255),
-                                   drawtos = [ CurveTo Absolute [ ((259, 261), (306, 84), (377, 185)) ] ] } ] 
+                                   drawtos = [ CurveTo Absolute [ ((259, 261), (toFloat topEndpoint1Pos.x, toFloat topEndpoint1Pos.y), (377, 185)) ] ] } ] 
     in
         svg
           [ width "500", height "500", viewBox "0 0 500 500" ]
@@ -80,11 +82,14 @@ updateHelp : Msg -> Model -> Model
 updateHelp msg ({topEndpoint1Pos, drag} as model) =
   case msg of
     DragStart dragged pos ->
-        {model | drag = Just (Drag dragged pos pos)} 
+        Model (getPosition model) (Just (Drag dragged pos))
 
     DragAt dragged pos ->
-        {model | drag = Maybe.map (\{start} -> Drag dragged start pos) drag}
+        case drag of
+            Nothing -> model
+            Just drag2 -> Model (getPosition model) (Just (Drag dragged pos))
 
+        -- {model | drag = Maybe.map (\{start} -> Drag dragged start pos) drag}
     DragEnd dragged _ ->
       Model (getPosition model) Nothing
 
@@ -94,10 +99,10 @@ getPosition {topEndpoint1Pos, drag} =
   case drag of
     Nothing -> topEndpoint1Pos
 
-    Just {start,current} ->
-      Position
-        (topEndpoint1Pos.x + current.x - start.x)
-        (topEndpoint1Pos.y + current.y - start.y)
+    Just {current} -> current
+      -- Position
+      --   (topEndpoint1Pos.x + current.x - start.x)
+      --   (topEndpoint1Pos.y + current.y - start.y)
 
 
 
