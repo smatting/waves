@@ -1,102 +1,116 @@
 module App exposing (..)
-
 import Html exposing (Html, button, div, text, program)
 import Html.Events exposing (onClick, on, onWithOptions)
 import Json.Decode as Decode
 import Mouse exposing (Position)
-
-import Svg exposing (..)
+import Svg
 import Svg.Attributes exposing (..)
+import Path.LowLevel as LL exposing (Coordinate)
 
-import Path.LowLevel as LL exposing (..)
+type alias Lens a b = {
+    get : a -> b,
+    set : b -> a -> a
+}
 
 -- MODEL
-
-
 type alias Model = {
-    topEndpoint1Pos : Position,
+    topControl2Point : Coordinate,
+    topEndpoint2Point : Coordinate,
     drag : Maybe Drag
-    }
+}
 
 
-type alias Drag = { dragged : Dragged, current : Position }
+type alias Drag = {
+    control : Control,
+    controlOrigin : Coordinate,
+    start : Position,
+    current : Position
+}
 
-type Dragged = DragTopEndpoint1
 
-init : ( Model, Cmd Msg )
+type Control = TopControl2Drag | TopEndpoint2Drag
+
+
+init : (Model, Cmd Msg)
 init =
-    ( Model (Position 306 84) Nothing, Cmd.none )
+    (Model (306.0, 84.0) (377.0, 185.0) Nothing, Cmd.none)
+
+
+onMouseDown : Control -> Html.Attribute Msg
+onMouseDown control =
+    let options = { stopPropagation = True , preventDefault = True }
+    in onWithOptions "mousedown" options (Decode.map (DragStart control) Mouse.position)
 
 
 -- VIEW
-dragButton : Position -> Html.Html Msg
-dragButton pos =
-    let w = 30
-    in
-    rect [ x (Basics.toString (pos.x - w // 2)),
-           y (Basics.toString (pos.y - w // 2)),
-           width (Basics.toString w),
-           height (Basics.toString w),
-           onMouseDown DragTopEndpoint1 ]
-         []
-
-onMouseDown : Dragged -> Attribute Msg
-onMouseDown dragged =
-    let options = { stopPropagation = True , preventDefault = True }
-    in onWithOptions "mousedown" options (Decode.map (DragStart dragged) Mouse.position)
+controlHandle : Control -> Coordinate -> Html.Html Msg
+controlHandle control (pointX, pointY) =
+    let w = 7 in
+    Svg.circle [ cx (toString pointX),
+                 cy (toString pointY),
+                 r (toString w),
+                 onMouseDown control ]
+             []
 
 waves : Model -> Html.Html Msg
-waves ({topEndpoint1Pos} as model) =
+waves ({topControl2Point, topEndpoint2Point} as model) =
     let
-        pathSpec = LL.toString [ { moveto =  MoveTo Absolute (49, 255),
-                                   drawtos = [ CurveTo Absolute [ ((259, 261), (toFloat topEndpoint1Pos.x, toFloat topEndpoint1Pos.y), (377, 185)) ] ] } ] 
+        pathSpec = LL.toString [{moveto =  LL.MoveTo LL.Absolute (49, 255),
+                                 drawtos = [LL.CurveTo LL.Absolute [((259, 261), topControl2Point, topEndpoint2Point)]] } ]
     in
-        svg
-          [ width "500", height "500", viewBox "0 0 500 500" ]
-          [ Svg.path [ d pathSpec, stroke "black", fill "none", strokeWidth "2" ] [],
-            dragButton model.topEndpoint1Pos ]
+        Svg.svg
+          [width "800", height "500", viewBox "0 0 800 500"]
+          [Svg.path [ d pathSpec, stroke "black", fill "none", strokeWidth "2"] [],
+           controlHandle TopControl2Drag topControl2Point,
+           controlHandle TopEndpoint2Drag topEndpoint2Point]
 
 
 view : Model -> Html Msg
-view model = waves model
+view model = div [] [waves model]
 
 
 -- UPDATE
 type Msg
-    = DragStart Dragged Position
+    = DragStart Control Position
     | DragAt Position
     | DragEnd Position
 
 
-update : Msg -> Model -> ( Model, Cmd Msg )
+update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
-  ( updateHelp msg model, Cmd.none )
+    (updateHelp msg model, Cmd.none)
 
 
-setPosition : Dragged -> Position -> Model -> Model
-setPosition dragged =
-    case dragged of
-        DragTopEndpoint1 -> (\pos model -> { model | topEndpoint1Pos = pos })
+applyDrag : Drag -> Lens Model Coordinate -> Model -> Model
+applyDrag {control, controlOrigin, start, current} {get, set} model =
+    let f = \(originX, originY) start current ->
+        (originX + (toFloat (current.x - start.x)),
+         originY + (toFloat (current.y - start.y)))
+        xy_ = f controlOrigin start current
+    in set xy_ model 
 
-setDrag : Maybe Drag -> Model -> Model
-setDrag maybeDrag model = { model | drag = maybeDrag }
+
+coord : Control -> Lens Model Coordinate
+coord control =
+    case control of
+        TopControl2Drag  -> Lens (\model -> model.topControl2Point) (\xy model -> {model | topControl2Point = xy})
+        TopEndpoint2Drag -> Lens (\model -> model.topEndpoint2Point) (\xy model -> {model | topEndpoint2Point = xy})
 
 
 updateHelp : Msg -> Model -> Model
 updateHelp msg model =
     case msg of
-        DragStart dragged pos ->
-            model |> setDrag (Just (Drag dragged pos))
-                  |> setPosition dragged pos
+        DragStart control pos ->
+            let xy = ((coord control).get model)
+            in {model | drag = Just (Drag control xy pos pos)}
 
         DragAt pos ->
-            let {drag} = model in
-            case drag of
-                Nothing -> model
-                Just drag_ -> model |> setDrag (Just (Drag drag_.dragged pos))
-                                    |> setPosition drag_.dragged pos
+            case model.drag of
+                Nothing    -> model
+                Just drag  -> {model | drag = Just {drag | current = pos}}
+                              |> applyDrag drag (coord drag.control)
         DragEnd _ ->
-            model |> setDrag Nothing
+            {model | drag = Nothing}
 
 
 -- SUBSCRIPTIONS
