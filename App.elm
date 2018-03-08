@@ -12,57 +12,62 @@ type alias Lens a b = {
     set : b -> a -> a
 }
 
+type alias Parameter = {
+    topControl2Point : Coordinate,
+    topEndpoint2Point : Coordinate
+}
+
 -- MODEL
 type alias Model = {
-    topControl2Point : Coordinate,
-    topEndpoint2Point : Coordinate,
+    param : Parameter,
     drag : Maybe Drag
 }
 
 
 type alias Drag = {
-    control : Control,
+    lens : Lens Parameter Coordinate,
     controlOrigin : Coordinate,
     start : Position,
     current : Position
 }
 
 
-type Control = TopControl2Drag | TopEndpoint2Drag
 
 
 init : (Model, Cmd Msg)
 init =
-    (Model (306.0, 84.0) (377.0, 185.0) Nothing, Cmd.none)
+    (Model (Parameter (306.0, 84.0) (377.0, 185.0)) Nothing, Cmd.none)
 
 
-onMouseDown : Control -> Html.Attribute Msg
-onMouseDown control =
+onMouseDown : Lens Parameter Coordinate -> Html.Attribute Msg
+onMouseDown lens =
     let options = { stopPropagation = True , preventDefault = True }
-    in onWithOptions "mousedown" options (Decode.map (DragStart control) Mouse.position)
+    in onWithOptions "mousedown" options (Decode.map (DragStart lens) Mouse.position)
 
 
 -- VIEW
-controlHandle : Control -> Coordinate -> Html.Html Msg
-controlHandle control (pointX, pointY) =
-    let w = 7 in
+controlHandle : Lens Parameter Coordinate -> Parameter -> Html.Html Msg
+controlHandle lens param =
+    let w = 7
+        (pointX, pointY) = lens.get param
+    in
     Svg.circle [ cx (toString pointX),
                  cy (toString pointY),
                  r (toString w),
-                 onMouseDown control ]
+                 onMouseDown lens]
              []
 
 waves : Model -> Html.Html Msg
-waves ({topControl2Point, topEndpoint2Point} as model) =
+waves ({param} as model) =
     let
         pathSpec = LL.toString [{moveto =  LL.MoveTo LL.Absolute (49, 255),
-                                 drawtos = [LL.CurveTo LL.Absolute [((259, 261), topControl2Point, topEndpoint2Point)]] } ]
+                                 drawtos = [LL.CurveTo LL.Absolute [((259, 261), param.topControl2Point, param.topEndpoint2Point)]] } ]
     in
         Svg.svg
           [width "800", height "500", viewBox "0 0 800 500"]
           [Svg.path [ d pathSpec, stroke "black", fill "none", strokeWidth "2"] [],
-           controlHandle TopControl2Drag topControl2Point,
-           controlHandle TopEndpoint2Drag topEndpoint2Point]
+           controlHandle (Lens (\param -> param.topControl2Point) (\xy param -> {param | topControl2Point = xy})) param,
+           controlHandle (Lens (\param -> param.topEndpoint2Point) (\xy param -> {param | topEndpoint2Point = xy})) param]
 
 
 view : Model -> Html Msg
@@ -71,7 +76,7 @@ view model = div [] [waves model]
 
 -- UPDATE
 type Msg
-    = DragStart Control Position
+    = DragStart (Lens Parameter Coordinate) Position
     | DragAt Position
     | DragEnd Position
 
@@ -81,34 +86,28 @@ update msg model =
     (updateHelp msg model, Cmd.none)
 
 
-applyDrag : Drag -> Lens Model Coordinate -> Model -> Model
-applyDrag {control, controlOrigin, start, current} {get, set} model =
+applyDrag : Drag -> Parameter -> Parameter
+applyDrag {lens, controlOrigin, start, current} param =
     let f = \(originX, originY) start current ->
         (originX + (toFloat (current.x - start.x)),
          originY + (toFloat (current.y - start.y)))
-        xy_ = f controlOrigin start current
-    in set xy_ model 
-
-
-coord : Control -> Lens Model Coordinate
-coord control =
-    case control of
-        TopControl2Drag  -> Lens (\model -> model.topControl2Point) (\xy model -> {model | topControl2Point = xy})
-        TopEndpoint2Drag -> Lens (\model -> model.topEndpoint2Point) (\xy model -> {model | topEndpoint2Point = xy})
+        xy = f controlOrigin start current
+    in lens.set xy param 
 
 
 updateHelp : Msg -> Model -> Model
 updateHelp msg model =
     case msg of
-        DragStart control pos ->
-            let xy = ((coord control).get model)
-            in {model | drag = Just (Drag control xy pos pos)}
+        DragStart lens pos ->
+            let xy = lens.get model.param
+            in {model | drag = Just (Drag lens xy pos pos)}
 
         DragAt pos ->
             case model.drag of
                 Nothing    -> model
-                Just drag  -> {model | drag = Just {drag | current = pos}}
-                              |> applyDrag drag (coord drag.control)
+                Just drag  -> {model | drag  = Just {drag | current = pos},
+                                       param = applyDrag drag model.param}
+
         DragEnd _ ->
             {model | drag = Nothing}
 
