@@ -15,14 +15,34 @@ type alias Lens a b = {
 
 -- MODEL
 type alias Parameter = {
-    topControl2Point  : Coordinate,
-    topEndpoint2Point : Coordinate,
-    dummyParam : Float
+    topControlPoint1  : Coordinate,
+    topControlPoint2  : Coordinate,
+    topEndpointPoint2 : Coordinate,
+
+    topEndPoint1dy : Float,
+    topControlPoint1dy : Float,
+    topControlPoint1dx : Float,
+    topControlPoint2dy : Float,
+    topControlPoint2dx : Float,
+    topEndPoint2dx : Float,
+    topEndPoint2dy : Float,
+
+    bottomEndPoint1 : Coordinate,
+    bottomControlPoint1 : Coordinate,
+    bottomControlPoint2 : Coordinate,
+    bottomEndPoint1dx : Float,
+    bottomEndPoint1dy : Float,
+    bottomControlPoint1dy : Float,
+    bottomControlPoint1dx : Float,
+    bottomControlPoint2dy : Float,
+    bottomControlPoint2dx : Float,
+    bottomEndPoint2dy : Float
 }
 
 type alias Model = {
     param : Parameter,
-    drag  : Maybe Drag
+    drag  : Maybe Drag,
+    showHandles : Bool
 }
 
 type alias Drag = {
@@ -35,10 +55,33 @@ type alias Drag = {
 init : (Model, Cmd Msg)
 init =
     let model = 
-        {param = {topControl2Point = (306.0, 84.0),
-                  topEndpoint2Point = (377.0, 185.0),
-                  dummyParam = 0.5},
-         drag  = Nothing}
+        {param = {
+            topControlPoint1 = (259.0, 261.0),
+            topControlPoint2 = (306.0, 84.0),
+            topEndpointPoint2 = (377.0, 185.0),
+
+            topEndPoint1dy = 25,
+            topControlPoint1dx = 0,
+            topControlPoint1dy = 25,
+            topControlPoint2dx = -12,
+            topControlPoint2dy = 25,
+            topEndPoint2dx = -13,
+            topEndPoint2dy = 20,
+
+            bottomEndPoint1 = (400.0, 200.0),
+            bottomControlPoint1 = (500.0, 450.0),
+            bottomControlPoint2 = (700.0, 250.0),
+
+            bottomEndPoint1dx = -10,
+            bottomEndPoint1dy = 22,
+            bottomControlPoint1dx = 3,
+            bottomControlPoint1dy = 17,
+            bottomControlPoint2dx = 50,
+            bottomControlPoint2dy = 25,
+            bottomEndPoint2dy = 25
+         },
+         drag  = Nothing,
+         showHandles = True}
     in (model, Cmd.none)
 
 
@@ -82,34 +125,126 @@ sliderView sliderSpec lens param =
              , text (toString value)]
 
 
-topWave : Coordinate -> Coordinate -> Coordinate -> Coordinate -> Svg.Svg Msg
-topWave endPoint1 controlPoint1 controlPoint2 endPoint2 =
+wave : Coordinate -> Coordinate -> Coordinate -> Coordinate -> Svg.Svg Msg
+wave endPoint1 controlPoint1 controlPoint2 endPoint2 =
     let
         pathSpec = LL.toString [{moveto =  LL.MoveTo LL.Absolute endPoint1,
                                  drawtos = [LL.CurveTo LL.Absolute [(controlPoint1, controlPoint2, endPoint2)]] } ]
-    in Svg.path [ d pathSpec, stroke "black", fill "none", strokeWidth "1.5"] []
+    in Svg.path [ d pathSpec, stroke "black", fill "none", strokeWidth "3", strokeLinecap "round"] []
+
+
+addDelta : Coordinate -> Float -> Coordinate -> Coordinate
+addDelta (startX, startY) s (deltaX, deltaY) =
+    (startX + s * deltaX, startY + s * deltaY)
+
+
+isNothing : Maybe a -> Bool
+isNothing m =
+    case m of
+        Nothing -> True
+        Just _ -> False
 
 
 waves : Model -> Html.Html Msg
-waves ({param} as model) =
+waves ({param, showHandles} as model) =
     let range = List.map (\i -> toFloat i) (List.range 0 5)
-        ws = List.map (\i -> topWave (49, 255 + i * param.dummyParam) (259, 261) param.topControl2Point param.topEndpoint2Point) range
-        handles = [curveHandle (Lens (\param -> param.topControl2Point) (\xy param -> {param | topControl2Point = xy})) param,
-                   curveHandle (Lens (\param -> param.topEndpoint2Point) (\xy param -> {param | topEndpoint2Point = xy})) param]
+        topWaves = List.map (\i -> wave
+                                       (addDelta (0, 250) i (0.0, param.topEndPoint1dy))
+                                       (addDelta param.topControlPoint1 i (param.topControlPoint1dx, param.topControlPoint1dy))
+                                       (addDelta param.topControlPoint2 i (param.topControlPoint2dx, param.topControlPoint2dy))
+                                       (addDelta param.topEndpointPoint2 i (param.topEndPoint2dx, param.topEndPoint2dy)))
+                   range
+        bottomWaves = List.map (\i -> wave
+                                          (addDelta param.bottomEndPoint1 i (param.bottomEndPoint1dx, param.bottomEndPoint1dy))
+                                          (addDelta param.bottomControlPoint1 i (param.bottomControlPoint1dx, param.bottomControlPoint1dy))
+                                          (addDelta param.bottomControlPoint2 i (param.bottomControlPoint2dx, param.bottomControlPoint2dy))
+                                          (addDelta (1000, 250) i (0.0, param.bottomEndPoint2dy)))
+                      range
+        topHandles = [curveHandle (Lens (\param -> param.topControlPoint2) (\xy param -> {param | topControlPoint2 = xy})) param,
+                      curveHandle (Lens (\param -> param.topEndpointPoint2) (\xy param -> {param | topEndpointPoint2 = xy})) param,
+                      curveHandle (Lens (\param -> param.topControlPoint1) (\xy param -> {param | topControlPoint1 = xy})) param]
+        bottomHandles = [curveHandle (Lens (\param -> param.bottomEndPoint1) (\xy param -> {param | bottomEndPoint1 = xy})) param,
+                         curveHandle (Lens (\param -> param.bottomControlPoint1) (\xy param -> {param | bottomControlPoint1 = xy})) param,
+                         curveHandle (Lens (\param -> param.bottomControlPoint2) (\xy param -> {param | bottomControlPoint2 = xy})) param
+                         ]
+        handles = if showHandles && (isNothing model.drag) then topHandles ++ bottomHandles else []
     in Svg.svg
-           [S.width "800", S.height "500", S.viewBox "0 0 800 500"]
-           (ws ++ handles)
+           [S.width "1200", S.height "500", S.viewBox "0 0 1200 500"]
+           (topWaves ++ bottomWaves ++ handles)
       
 
-controls : Parameter -> Html.Html Msg
-controls param =
-    div [] [sliderView {min = 5, max = 50, step = 1, name = "dummyParam"}
-                       (Lens (\param -> param.dummyParam) (\value param -> {param | dummyParam = value}))
-                       param]
+topControls : Parameter -> Html.Html Msg
+topControls param =
+    div []
+    [sliderView {min = 5, max = 50, step = 1, name = "topEndPoint1dy"}
+                (Lens (\param -> param.topEndPoint1dy) (\value param -> {param | topEndPoint1dy = value}))
+                param,
+
+     sliderView {min = -50, max = 50, step = 1, name = "topControlPoint1dx"}
+                (Lens (\param -> param.topControlPoint1dx) (\value param -> {param | topControlPoint1dx = value}))
+                param,
+     sliderView {min = 5, max = 50, step = 1, name = "topControlPoint1dy"}
+                (Lens (\param -> param.topControlPoint1dy) (\value param -> {param | topControlPoint1dy = value}))
+                param,
+
+     sliderView {min = -50, max = 50, step = 1, name = "topControlPoint2dx"}
+                (Lens (\param -> param.topControlPoint2dx) (\value param -> {param | topControlPoint2dx = value}))
+                param,
+     sliderView {min = 5, max = 50, step = 1, name = "topControlPoint2dy"}
+                (Lens (\param -> param.topControlPoint2dy) (\value param -> {param | topControlPoint2dy = value}))
+                param,
+
+     sliderView {min = -50, max = 50, step = 1, name = "topEndPoint2dx"}
+                (Lens (\param -> param.topEndPoint2dx) (\value param -> {param | topEndPoint2dx = value}))
+                param,
+     sliderView {min = 5, max = 50, step = 1, name = "topEndPoint2dy"}
+                (Lens (\param -> param.topEndPoint2dy) (\value param -> {param | topEndPoint2dy = value}))
+                param
+    ]
+
+bottomControls : Parameter -> Html.Html Msg
+bottomControls param =
+    div []
+    [sliderView {min = -50, max = 50, step = 1, name = "bottomEndPoint1dx"}
+                (Lens (\param -> param.bottomEndPoint1dx) (\value param -> {param | bottomEndPoint1dx = value}))
+                param,
+     sliderView {min = 5, max = 50, step = 1, name = "bottomEndPoint1dy"}
+                (Lens (\param -> param.bottomEndPoint1dy) (\value param -> {param | bottomEndPoint1dy = value}))
+                param,
+
+     sliderView {min = -50, max = 50, step = 1, name = "bottomControlPoint1dx"}
+                (Lens (\param -> param.bottomControlPoint1dx) (\value param -> {param | bottomControlPoint1dx = value}))
+                param,
+     sliderView {min = 5, max = 50, step = 1, name = "bottomControlPoint1dy"}
+                (Lens (\param -> param.bottomControlPoint1dy) (\value param -> {param | bottomControlPoint1dy = value}))
+                param,
+     sliderView {min = -50, max = 50, step = 1, name = "bottomControlPoint2dx"}
+                (Lens (\param -> param.bottomControlPoint2dx) (\value param -> {param | bottomControlPoint2dx = value}))
+                param,
+     sliderView {min = 5, max = 50, step = 1, name = "bottomControlPoint2dy"}
+                (Lens (\param -> param.bottomControlPoint2dy) (\value param -> {param | bottomControlPoint2dy = value}))
+                param,
+     sliderView {min = 5, max = 50, step = 1, name = "bottomEndPoint2dy"}
+                (Lens (\param -> param.bottomEndPoint2dy) (\value param -> {param | bottomEndPoint2dy = value}))
+                param
+     ]
+            
+
+checkbox : msg -> String -> Html msg
+checkbox msg name =
+        Html.label
+        [ H.style [("padding", "20px")]
+        ]
+        [ Html.input [ H.type_ "checkbox", onClick msg,  H.checked True] []
+        , text name
+        ]
 
 
 view : Model -> Html Msg
-view model = div [] [waves model, controls model.param]
+view model = div [] [waves model,
+                     checkbox ToggleHandles "toggle handles",
+                     topControls model.param,
+                     bottomControls model.param]
 
 -- UPDATE
 type Msg
@@ -117,6 +252,7 @@ type Msg
     | DragAt Position
     | DragEnd Position
     | SliderUpdate (Lens Parameter Float) Float
+    | ToggleHandles
 
 
 update : Msg -> Model -> (Model, Cmd Msg)
@@ -152,6 +288,8 @@ updateHelp msg model =
         SliderUpdate lens value ->
             let param2 = lens.set value model.param
             in {model | param = param2}
+
+        ToggleHandles -> {model | showHandles = not model.showHandles}
 
 
 -- SUBSCRIPTIONS
