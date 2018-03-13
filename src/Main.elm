@@ -1,4 +1,4 @@
-module App exposing (..)
+module Main exposing (..)
 import Html exposing (Html, button, div, text, program)
 import Html.Events exposing (onClick, on, onWithOptions, onInput)
 import Html.Attributes as H exposing (..)
@@ -56,24 +56,24 @@ init : (Model, Cmd Msg)
 init =
     let model = 
         {param = {
-            topControlPoint1 = (259.0, 261.0),
-            topControlPoint2 = (306.0, 84.0),
-            topEndpointPoint2 = (377.0, 185.0),
+            topControlPoint1 = (559.0, 261.0),
+            topControlPoint2 = (606.0, 84.0),
+            topEndpointPoint2 = (677.0, 185.0),
 
             topEndPoint1dy = 25,
             topControlPoint1dx = 0,
             topControlPoint1dy = 25,
             topControlPoint2dx = -12,
             topControlPoint2dy = 25,
-            topEndPoint2dx = -13,
+            topEndPoint2dx = -12,
             topEndPoint2dy = 20,
 
-            bottomEndPoint1 = (400.0, 200.0),
-            bottomControlPoint1 = (500.0, 450.0),
-            bottomControlPoint2 = (700.0, 250.0),
+            bottomEndPoint1 = (700.0, 200.0),
+            bottomControlPoint1 = (800.0, 450.0),
+            bottomControlPoint2 = (1000.0, 250.0),
 
-            bottomEndPoint1dx = -10,
-            bottomEndPoint1dy = 22,
+            bottomEndPoint1dx = -12,
+            bottomEndPoint1dy = 20,
             bottomControlPoint1dx = 3,
             bottomControlPoint1dy = 17,
             bottomControlPoint2dx = 50,
@@ -112,7 +112,7 @@ sliderView sliderSpec lens param =
     let value = (lens.get param)
     in
         div []
-            [text sliderSpec.name
+            [  Html.span [H.class "control-label"] [text sliderSpec.name]
              , Html.input
                [ H.type_ "range"
                , H.min (toString sliderSpec.min)
@@ -122,7 +122,7 @@ sliderView sliderSpec lens param =
                , onInput (\s -> SliderUpdate lens (Result.withDefault 0.0 (String.toFloat s)))
                ]
                []
-             , text (toString value)]
+             , Html.span [H.class "control-value"] [text (toString value)]]
 
 
 wave : Coordinate -> Coordinate -> Coordinate -> Coordinate -> Svg.Svg Msg
@@ -158,7 +158,7 @@ waves ({param, showHandles} as model) =
                                           (addDelta param.bottomEndPoint1 i (param.bottomEndPoint1dx, param.bottomEndPoint1dy))
                                           (addDelta param.bottomControlPoint1 i (param.bottomControlPoint1dx, param.bottomControlPoint1dy))
                                           (addDelta param.bottomControlPoint2 i (param.bottomControlPoint2dx, param.bottomControlPoint2dy))
-                                          (addDelta (1000, 250) i (0.0, param.bottomEndPoint2dy)))
+                                          (addDelta (1200, 250) i (0.0, param.bottomEndPoint2dy)))
                       range
         topHandles = [curveHandle (Lens (\param -> param.topControlPoint2) (\xy param -> {param | topControlPoint2 = xy})) param,
                       curveHandle (Lens (\param -> param.topEndpointPoint2) (\xy param -> {param | topEndpointPoint2 = xy})) param,
@@ -169,13 +169,13 @@ waves ({param, showHandles} as model) =
                          ]
         handles = if showHandles && (isNothing model.drag) then topHandles ++ bottomHandles else []
     in Svg.svg
-           [S.width "1200", S.height "500", S.viewBox "0 0 1200 500"]
+           [S.id "wave-svg", S.width "1200", S.height "500", S.viewBox "0 0 1200 500"]
            (topWaves ++ bottomWaves ++ handles)
       
 
 topControls : Parameter -> Html.Html Msg
 topControls param =
-    div []
+    div [ H.class "pure-u-1-2" ]
     [sliderView {min = 5, max = 50, step = 1, name = "topEndPoint1dy"}
                 (Lens (\param -> param.topEndPoint1dy) (\value param -> {param | topEndPoint1dy = value}))
                 param,
@@ -204,7 +204,7 @@ topControls param =
 
 bottomControls : Parameter -> Html.Html Msg
 bottomControls param =
-    div []
+    div [ H.class "pure-u-1-2" ]
     [sliderView {min = -50, max = 50, step = 1, name = "bottomEndPoint1dx"}
                 (Lens (\param -> param.bottomEndPoint1dx) (\value param -> {param | bottomEndPoint1dx = value}))
                 param,
@@ -243,8 +243,8 @@ checkbox msg name =
 view : Model -> Html Msg
 view model = div [] [waves model,
                      checkbox ToggleHandles "toggle handles",
-                     topControls model.param,
-                     bottomControls model.param]
+                     div [H.class "pure-g"] [topControls model.param, bottomControls model.param]
+                     ]
 
 -- UPDATE
 type Msg

@@ -1,0 +1,19 @@
+#main {
+    width: 1200px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.control-label {
+    width: 200px;
+    display: inline-block;
+    text-align: right;
+    padding-right: 1em;
+}
+
+.control-value {
+    width: 3em;
+    font-family: monospace;
+    display: inline-block;
+    text-align: right;
+}

@@ -1,1 +1,6 @@
 elm-stuff
+dist
+node_modules
+*.lock
+*.log
+package-lock.json
