@@ -1,6 +1,6 @@
 A small Elm app to draw waves with Bezier lines.
 
-!()[https://github.com/smatting/waves/blob/master/doc/waves.png|alt=waves]
+![Waves](/doc/waves.png?raw=true)
 
 There is a [live demo](https://smatting.github.io/waves-demo/) available.
 
