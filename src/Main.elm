@@ -66,14 +66,14 @@ init =
             topControlPoint2dx = -12,
             topControlPoint2dy = 25,
             topEndPoint2dx = -12,
-            topEndPoint2dy = 20,
+            topEndPoint2dy = 25,
 
-            bottomEndPoint1 = (700.0, 200.0),
+            bottomEndPoint1 = (700.0, 250.0),
             bottomControlPoint1 = (800.0, 450.0),
             bottomControlPoint2 = (1000.0, 250.0),
 
             bottomEndPoint1dx = -12,
-            bottomEndPoint1dy = 20,
+            bottomEndPoint1dy = 25,
             bottomControlPoint1dx = 3,
             bottomControlPoint1dy = 17,
             bottomControlPoint2dx = 50,
